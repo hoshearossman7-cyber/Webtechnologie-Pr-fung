@@ -133,9 +133,15 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      flex-wrap: wrap;
       gap: 12px;
       margin-bottom: 10px;
       background: #f8fafc;
+    }
+
+    .user-item.selected {
+      border-color: var(--primary);
+      background: #eff6ff;
     }
 
     .progress-wrap {
@@ -291,6 +297,7 @@
         return {
           users: {},
           activeUser: null,
+          selectedUser: null,
           view: "lobby",
           learnIndex: 0,
           learnFeedback: null,
@@ -350,10 +357,6 @@
           .replace(/"/g, "&quot;");
       }
 
-      function escapeJs(str) {
-        return String(str).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
-      }
-
       function createOrLoginUser(nameInput, passInput) {
         const name = nameInput.trim();
         const pass = passInput;
@@ -375,12 +378,13 @@
           };
         } else {
           if (state.users[name].password !== pass) {
-            alert("Falsches Passwort für diesen Benutzer-Ordner.");
+            alert("Falsches Passwort für diese Benutzerdatei.");
             return;
           }
           state.users[name].online = true;
         }
         state.activeUser = name;
+        state.selectedUser = name;
         state.view = "learn";
         state.learnIndex = 0;
         state.learnFeedback = null;
@@ -488,7 +492,7 @@
           return;
         }
         hc.innerHTML = `
-          <span>Ordner: <strong>${escapeHtml(state.activeUser)}</strong></span>
+          <span>Datei: <strong>${escapeHtml(state.activeUser)}</strong></span>
           ${state.view === "exam" ? `<span class="timer-badge" id="examTimer">Zeit: ${formatTime(state.examRemaining)}</span>` : ""}
           <button type="button" class="secondary" id="btnLearn">Lernen</button>
           <button type="button" id="btnStartExam">Prüfung beginnen</button>
@@ -505,17 +509,19 @@
       function renderLobby() {
         const names = Object.keys(state.users);
         const onlineCount = names.filter((n) => state.users[n] && state.users[n].online).length;
+        const chosenName = state.selectedUser && state.users[state.selectedUser] ? state.selectedUser : "";
 
         const listHtml = names.length === 0
           ? `<p class="note">Noch keine Benutzer angelegt. Lege unten deinen Namen und dein Passwort an.</p>`
           : names.map((n) => {
               const u = state.users[n];
+              const isSelected = chosenName === n;
               return `
-                <div class="user-item">
+                <div class="user-item ${isSelected ? "selected" : ""}">
                   <div>
                     <strong>${escapeHtml(n)}</strong>
                     <span style="margin-left:8px; color:${u.online ? "#15803d" : "#64748b"}; font-weight:600;">
-                      ${u.online ? "● Drin / Aktiv" : "○ Nicht drin"}
+                      ${u.online ? "● Drin" : "○ Nicht drin"}
                     </span><br/>
                     <span class="note">
                       Prüfungen: <strong>${u.examsDone || 0}</strong> |
@@ -523,44 +529,46 @@
                       Nicht bestanden: <strong style="color:#b91c1c">${u.examsFailed || 0}</strong>
                     </span>
                   </div>
-                  <button type="button" class="secondary" data-open-user="${escapeHtml(n)}">Ordner öffnen</button>
+                  <button type="button" class="secondary" data-select-user="${escapeHtml(n)}">
+                    ${isSelected ? "Ausgewählt" : "Datei wählen"}
+                  </button>
                 </div>
               `;
             }).join("");
 
         document.getElementById("app").innerHTML = `
           <div class="card">
-            <h2>Übersicht der Lerngruppe</h2>
+            <h2>Übersicht der Benutzer</h2>
             <p>
-              Registrierte Benutzer insgesamt: <strong>${names.length}</strong> &nbsp;|&nbsp;
+              Anzahl Benutzer gesamt: <strong>${names.length}</strong> &nbsp;|&nbsp;
               Gerade drin: <strong>${onlineCount}</strong>
             </p>
             <p class="note">
-              Hinweis: In dieser reinen HTML-Version werden Daten lokal im Browser gespeichert. Jeder Benutzer-Ordner ist durch ein Passwort geschützt.
+              Wähle deinen Namen aus der Liste, um deine Benutzerdatei zu öffnen, oder lege unten einen neuen Namen an.
             </p>
             ${listHtml}
           </div>
 
           <div class="card">
-            <h2>Benutzer-Ordner anlegen oder öffnen</h2>
+            <h2>${chosenName ? `Passwort für „${escapeHtml(chosenName)}“ eingeben` : "Neuen Benutzer anlegen oder Datei öffnen"}</h2>
             <form id="authForm">
-              <label for="userName">Name</label>
-              <input id="userName" type="text" placeholder="z. B. Ali oder Sara" required />
+              <label for="userName">Benutzername (Datei)</label>
+              <input id="userName" type="text" value="${escapeHtml(chosenName)}" placeholder="z. B. Ali oder Sara" required />
 
               <label for="userPass">Passwort</label>
-              <input id="userPass" type="password" placeholder="Dein Passwort für deinen Ordner" required />
+              <input id="userPass" type="password" placeholder="Passwort für diese Benutzerdatei" required />
 
-              <button type="submit">Weiter zum Lernen</button>
+              <button type="submit">Datei öffnen & Lernen</button>
             </form>
           </div>
         `;
 
-        document.querySelectorAll("[data-open-user]").forEach((btn) => {
+        document.querySelectorAll("[data-select-user]").forEach((btn) => {
           btn.onclick = () => {
-            const targetName = btn.getAttribute("data-open-user");
-            const inp = document.getElementById("userName");
+            state.selectedUser = btn.getAttribute("data-select-user");
+            saveState();
+            renderLobby();
             const pass = document.getElementById("userPass");
-            if (inp) inp.value = targetName;
             if (pass) pass.focus();
           };
         });
