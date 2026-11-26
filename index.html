@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WT1 Klausurtrainer & Prüfungssimulator</title>
+  <style>
+    :root {
+      --bg: #f3f5f9;
+      --card: #ffffff;
+      --text: #18202c;
+      --muted: #5c687a;
+      --primary: #1d4ed8;
+      --primary-hover: #1e40af;
+      --ok: #15803d;
+      --ok-bg: #dcfce7;
+      --bad: #b91c1c;
+      --bad-bg: #fee2e2;
+      --border: #d8dee9;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    header {
+      background: #0f172a;
+      color: #fff;
+      padding: 16px 24px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+
+    .brand { font-size: 1.1rem; font-weight: 700; }
+    .header-right { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+
+    .timer-badge {
+      background: #1e293b;
+      border: 1px solid #475569;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    button {
+      cursor: pointer;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      padding: 9px 14px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      background: var(--primary);
+      color: #fff;
+      transition: background 0.15s ease;
+    }
+
+    button:hover { background: var(--primary-hover); }
+    button.secondary { background: #e2e8f0; color: #0f172a; }
+    button.secondary:hover { background: #cbd5e1; }
+    button.danger { background: var(--bad); color: #fff; }
+
+    main {
+      max-width: 980px;
+      margin: 24px auto;
+      padding: 0 16px 48px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 18px;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+    }
+
+    h1, h2, h3 { margin-top: 0; }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+    }
+
+    input, textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      margin-top: 6px;
+      margin-bottom: 12px;
+      font-family: inherit;
+    }
+
+    .user-item {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+      background: #f8fafc;
+    }
+
+    .progress-wrap {
+      background: #e2e8f0;
+      border-radius: 999px;
+      height: 14px;
+      overflow: hidden;
+      margin: 10px 0;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: var(--ok);
+      width: 0%;
+      transition: width 0.25s ease;
+    }
+
+    .option-label {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      background: #fff;
+    }
+
+    .option-label input {
+      width: auto;
+      margin: 3px 0 0;
+    }
+
+    .feedback {
+      padding: 12px 14px;
+      border-radius: 8px;
+      margin-top: 12px;
+      font-weight: 500;
+    }
+
+    .feedback.ok { background: var(--ok-bg); color: var(--ok); }
+    .feedback.bad { background: var(--bad-bg); color: var(--bad); }
+
+    .nav-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 14px 0;
+    }
+
+    .q-jump {
+      width: 38px;
+      height: 36px;
+      padding: 0;
+      font-size: 0.85rem;
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+
+    .q-jump.active {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    .q-jump.answered {
+      border: 2px solid #0f172a;
+    }
+
+    .note {
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+
+    pre {
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 12px;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-size: 0.88rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">WT1 Klausurtrainer & Prüfungssimulator</div>
+    <div class="header-right" id="headerControls"></div>
+  </header>
+
+  <main id="app"></main>
+
+  <script>
+    const PASS_THRESHOLD = 0.5; // ab 50 % bestanden
+    const EXAM_SECONDS = 130 * 60; // 130 Minuten
+    const STORAGE_KEY = "wt1_app_state_v1";
+
+    const QUESTIONS = [
+      { id: 1, type: "single", q: "Welche Aussage zur Informationsgesellschaft ist richtig?", options: ["Die Internet Ökonomie ist ein kleiner Ausschnitt des Electronic Business", "Electronic Entertainment kann nur Thomas Gottschalk", "Electronic Commerce ist eine Untermenge von Electronic Business", "Die Informationsgesellschaft ist eine Zukunftsvision", "Electronic Education ist der Vorläufer der Informationsgesellschaft"], correct: [2] },
+      { id: 2, type: "single", q: "Welche Aussage ist falsch?", options: ["1963 gründeten die ersten Universitäten der USA das Internet", "Das Internet ist aus dem militärischen ARPANET entstanden", "Mitte der 70er Jahre wurde TCP/IP entwickelt", "Der erste Browser wurde Anfang der 90er Jahre entwickelt"], correct: [0] },
+      { id: 3, type: "single", q: "Welche Aussage zur Bandbreite der Internet-Netzwerke ist richtig?", options: ["Die Bandbreite nimmt von den NSP zu den ISP ab", "Die Bandbreite nimmt von den ISP zu den NSP zu", "Die Bandbreite ist immer gleich", "Die Server für die ISP sind schnell", "Keine der Aussagen ist richtig", "Keiner weiß was ISP ist"], correct: [0] },
+      { id: 4, type: "single", q: "Welche Aussage zur Organisation der Internet Domänen ist richtig?", options: ["Hierarchisch, ähnlich einem Unix-System, Top-Level Domain steht am Adress-Ende", "Hierarchisch, ähnlich einem Windows-System, Top-Level Domain steht am Adress-Ende", "Non-hierarchisch, keinem Betriebssysteme ähnlich, Top-Level Domain steht am Adress-Anfang", "Das Domänenkonzept ist frei erfunden"], correct: [0] },
+      { id: 5, type: "single", q: "Welche Aussage zum TCP/IP-Protokoll bzw. zum OSI-Modell ist falsch?", options: ["Das TCP/IP-Protokoll hat vier Schichten", "Das ISO/OSI-Modell hat sieben Schichten", "Das TCP/IP-Protokoll ist das neuere Modell und fasst die Schichten zusammen", "Das OSI-Modell ist das neuere Modell und spezifiziert das TCP/IP-Protokoll"], correct: [3] },
+      { id: 6, type: "single", q: "Welche Aussage zur Ethernet-Adresse ist richtig?", options: ["Ethernet-Adressen haben 32 Bit und liegen auf Schicht 3 des OSI-Modells", "Ethernet-Adressen habe 56 Bit und liegen auf Schicht 1 des OSI-Modells", "Ethernet-Adressen haben 48 Bit und liegen auf Schicht 2 des OSI-Modells", "Ethernet-Adressen haben 128 Bit und liegen auf Schicht 2 des OSI-Modells"], correct: [2] },
+      { id: 7, type: "single", q: "Was ist ARP und auf welcher Schicht des OSI Modells ist dieses anzutreffen?", options: ["Andere Rauben Programme und liegt auf Schicht vier", "Anwender Response Protokoll und liegt auf Schicht eins", "Address Resolution Protokoll und liegt auf Schicht drei", "Address Resolution Protocol und liegt auf Schicht zwei", "keine der Antworten ist richtig"], correct: [3] },
+      { id: 8, type: "single", q: "Was sind die Request for Comments?", options: ["Schriftenreihe über die Internet-Standards", "Schriftenreihe über die aktuellen Internet-Adressen", "Internet Standards", "Internet Kommentare zu Anfragen"], correct: [0] },
+      { id: 9, type: "single", q: "Welche Aussage trifft auf die Adresse 172.16.0.0 zu?", options: ["Es ist eine private IPv6-Adresse", "Es ist eine IPv6-Subnetzadresse", "Es ist eine MAC-Adresse", "Es ist eine private IPv4-Adresse"], correct: [3] },
+      { id: 10, type: "single", q: "Das Grundprinzip beim Subnetting ist", options: ["das Leihen von Bits aus dem Netzwerkanteil der IP-Adresse", "das Leihen von Bits aus dem Hostanteil der IP-Adresse", "das Leihen von Bits aus Netzwerk- und Hostanteil der IP-Adresse", "nur eine logische Verknüpfung von IP-Adresse und Subnetzmaske"], correct: [1] },
+      { id: 11, type: "single", q: "Welche Aussage zur Slash-Notation bei Internet-Adressen ist richtig?", options: ["Die Notation gibt die Anzahl Hosts an", "Die Notation gibt die Anzahl der Netzwerke an", "Die Notation gibt die Länge des Netzwerkpräfix an", "Die Notation gibt die Länge des Netzwerkpfades an"], correct: [2] },
+      { id: 12, type: "single", q: "Welche Netzwerkaufteilung wird in der Grafik (195.17.16.0/20 -> Subnets in a) und b)) gezeigt?", options: ["Ausgangsadresse 195.17.0.0/16, a) klassenbasiert, b) klassenlos", "Ausgangsadresse 195.17.16.0/20, a) klassenbasiert, b) klassenlos", "Ausgangsadresse 195.17.24.0/16, a) klassenlos, b) klassenbasiert", "Ausgangsadresse 195.17.30.0/20, a) klassenlos, b) klassenlos (Zusatzbit)"], correct: [1] },
+      { id: 13, type: "single", q: "Wie viele geliehene Bits zur Bildung von Subnetzen nach dem klassenbasierten System (RFC 950) erzeugen die meisten verwendbaren Client-Adressen in einem C-Class-Netzwerk?", options: ["2 Bits", "3 Bits", "6 Bits", "7 Bits", "8 Bits"], correct: [0] },
+      { id: 14, type: "single", q: "Warum hat der IPv4-Header ein Feld für die \"header length\"?", options: ["Der Header kann mehrere Adressen von Routern aufnehmen", "Der Header fragmentiert die Pakete und dann müssen die Größen angegeben werden", "Der Header kann durch Optionen und Padding unterschiedlich groß werden", "Der Header hat kein Feld \"header length\", weil die Fragmentierung Ende zu Ende erfolgt"], correct: [2] },
+      { id: 15, type: "single", q: "Welcher wesentliche Unterschied besteht zwischen den IPv4-Header und dem IPv6-Header?", options: ["Es gibt keinen, beide sind gleich", "Der Header von IPv4 ist immer 20 Byte groß", "Beim IPv6-Header gibt es kein PAD-Feld", "Der IPv6-Header ist immer 60 Byte groß"], correct: [2] },
+      { id: 16, type: "single", q: "Warum gibt es kein Feld \"Fragment Offset\" im IPv6-Base-Header?", options: ["Bei IPv6 wird direkt übertragen, Punkt zu Punkt", "Bei IPv6 gibt es keine Fragmentierung mehr", "Bei IPv6 wird die Datagramm-Länge gleich der Pfad-MTU gesetzt, Ende zu Ende", "Bei IPv6 ist alles anders", "Bei IPv6 dürfen nur die Router die Pakete fragmentieren"], correct: [2] },
+      { id: 17, type: "single", q: "Welche Aussage ist falsch?", options: ["Ein Router arbeitet auf dem Network-Layer", "Ein Switch arbeitet auf dem Data-Link-Layer", "Ein Repeater arbeitet auf dem Network-Layer", "Ein Gateway arbeitet mindestens auf dem Session-Layer", "Eine Bridge arbeitet auf dem Data-Link-Layer"], correct: [2] },
+      { id: 18, type: "multi", q: "Der XML-Tag <kunde>100</kunde> steht in einer Text-Datei mit dem Suffix xml. Welche Aussage stimmt?", options: ["Das Dokument ist nicht wohlgeformt", "Das Dokument ist ungültig, weil <kunde> kein Tag ist", "Das Dokument braucht eine Document Type Definition (DTD)", "Der Tag muss in HTML eingebettet werden"], correct: [2] },
+      { id: 19, type: "multi", q: "Welche Aussage beschreibt die zwei Stufen der „Medienkonvergenz“ am besten?", options: ["Die Medien werden immer kleiner", "Die Smartphones werden immer größer", "Telekommunikation, Informationstechnologie und Medien nähern sich an", "Telekommunikation und Medien werden eins", "Die Medienkonvergenz ist der Anfang allen Übels"], correct: [2, 3] },
+      { id: 20, type: "single", q: "Medienneutrale Datenhaltung?", options: ["ist wichtig für die Daten.", "hilft den Mitarbeitern der Redaktion.", "ist notwendig, um alle Medien anzubinden.", "kann nicht gewährleistet werden.", "ist eine neue Datenbank."], correct: [2] },
+      { id: 21, type: "multi", q: "Die Kernidee eines CMS-Systems ist?", options: ["die automatische Erstellung des Contents.", "die Trennung von Content und Layout.", "die Trennung von Web-Entwicklern und HTML.", "der Einsatz von Zeitungen im Internet.", "die Generierung eines Content Life Cycle."], correct: [1] },
+      { id: 22, type: "single", q: "Welche Aussage zu den Server-Konzepten bei einem CMS ist falsch?", options: ["Ein Staging-Server bietet hohe Sicherheit, da der Content statisch ist", "Ein Live-Server bietet hohe Aktualität", "Ein Live-Server ist unsicherer, weil auf die DB zugegriffen werden kann", "Ein Staging-Server ist sehr gut für hochdynamischen Content", "Ein Staging-Server wird zyklisch aktualisiert"], correct: [3] },
+      { id: 23, type: "single", q: "Supply Chain Management beschreibt?", options: ["die Lieferkette im E-Commerce", "das Enterprise Ressource Planning", "die Pflege des Kunden", "die Betreuung der Mitarbeiter", "das Modell des E-Commerce", "das Modell des E-Business"], correct: [0] },
+      { id: 24, type: "single", q: "Welches Business-Modell ist falsch angeordnet?", options: ["B2C, Internet", "B2B, Extranet", "B2E, Intranet", "C2C, Intranet", "B2A, Extranet"], correct: [3] },
+      { id: 25, type: "single", q: "Welche Aussage zur „Net-Economy“ ist falsch?", options: ["Die Entwicklung eines Unternehmens zur Net-Economy kostet Zeit", "Unternehmen, die virtuell gestartet sind, betreiben häufig Net-Economy", "Für Net-Economy müssen Unternehmens-Prozesse angepasst werden", "Cross-Selling gibt es bei Aldi und nicht in der Net-Economy", "E-Business ist eine Vorstufe zur Net-Economy"], correct: [3] },
+      { id: 26, type: "single", q: "Welche Aussage zu Benutzerprofilen im Internet ist falsch.", options: ["Die Handelstransaktion im Internet hat verschiedene Profile", "Page Impression liefern wichtige Daten über den anonymen Kunden", "AdClicks werden über Log-Files ausgewertet", "Pseudonyme Profile sind Kundendaten mit hoher Verbindlichkeit", "Nach dem Bezahlvorgang ist der Kunde identifiziert"], correct: [3] },
+      { id: 27, type: "single", q: "Ubiquitous Computing?", options: ["beschreibt die Allgegenwärtigkeit der Computer", "beschreibt die globalen Computer", "die Einzigartigkeit der Computer", "das Internet der Dinge"], correct: [0] },
+      { id: 28, type: "single", q: "Eine „Main Idea“?", options: ["ist das Leitmotiv einer Webseite", "ist die geniale Idee", "ist die Hauptidee für die Analysephase", "ist die Idee für den Webentwickler"], correct: [0] },
+      { id: 29, type: "single", q: "Welche der genannten Content-Inszenierungen ist falsch?", options: ["non hierarchisch", "kaskadisch", "spielerisch animiert", "linear", "farblich abgestimmt"], correct: [4] },
+      { id: 30, type: "single", q: "Welche Aussage zum Change Request Management ist richtig?", options: ["Der CR sollte immer vom Anforderer über den Projektmanager laufen", "Der CR sollte immer vom Anforderer über den Geschäftsführer laufen", "Der CR wird immer bearbeitet, denn der Kunde ist König", "Der CR wird ohne das Projektteam entschieden", "Der CR wird grundsätzlich nicht zugelassen"], correct: [0] },
+      {
+        id: 31,
+        type: "open",
+        q: "Frage 31 (10 Punkte): Gegeben ist ein HTML-Formular (action=\"tut_dinge.php\", method=\"post\") mit den Feldern Textfeld1 (Vorname) und Textfeld2 (Nachname). Erstelle ein PHP-Snippet, welches „Hallo Vorname Nachname!“ ausgibt.",
+        sampleAnswer: `<?php\n$vorname = htmlspecialchars($_POST['Textfeld1'] ?? '');\n$nachname = htmlspecialchars($_POST['Textfeld2'] ?? '');\necho "Hallo " . $vorname . " " . $nachname . "!";\n?>`
+      },
+      {
+        id: 32,
+        type: "open",
+        q: "Frage 32 (10 Punkte): Beschreibe kurz den Ablauf der Methoden __construct($var1, $var2, $var3), __destruct() und funktion1($var1) der Klasse A (MySQLi-Wrapper) und wann sie aufgerufen werden.",
+        sampleAnswer: `• __construct($var1,$var2, $var3): Erzeugt eine neue mysqli-Verbindung in$this->var. Wird automatisch beim Erstellen eines Objekts (new A(...)) aufgerufen.\n• funktion1($var1): Führt eine SQL-Abfrage ($this->var->query($var1)) aus und gibt das Ergebnis zurück. Wird explizit bei Bedarf aufgerufen.\n• __destruct(): Schließt die Datenbankverbindung ($this->var->close()). Wird automatisch am Ende der Lebensdauer des Objekts bzw. Skripts aufgerufen.`
+      }
+    ];
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) return JSON.parse(raw);
+      } catch (e) {}
+      return {
+        users: {}, // username -> { password, online, examsDone, examsPassed, examsFailed, learnedCorrectIds }
+        activeUser: null,
+        view: "lobby", // "lobby" | "learn" | "exam" | "result"
+        learnIndex: 0,
+        learnFeedback: null,
+        examIndex: 0,
+        examAnswers: {},
+        examRemaining: EXAM_SECONDS,
+        lastExamResult: null
+      };
+    }
+
+    let state = loadState();
+    let timerInterval = null;
+
+    function saveState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function formatTime(sec) {
+      const s = Math.max(0, sec);
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      const r = s % 60;
+      return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}`;
+    }
+
+    function setOnlineStatus(username, isOnline) {
+      if (username && state.users[username]) {
+        state.users[username].online = isOnline;
+        saveState();
+      }
+    }
+
+    window.addEventListener("beforeunload", () => {
+      if (state.activeUser) setOnlineStatus(state.activeUser, false);
+    });
+
+    function createOrLoginUser(nameInput, passInput) {
+      const name = nameInput.trim();
+      const pass = passInput;
+      if (!name || !pass) {
+        alert("Bitte Namen und Passwort eingeben.");
+        return;
+      }
+      if (state.activeUser && state.activeUser !== name) {
+        setOnlineStatus(state.activeUser, false);
+      }
+      if (!state.users[name]) {
+        state.users[name] = {
+          password: pass,
+          online: true,
+          examsDone: 0,
+          examsPassed: 0,
+          examsFailed: 0,
+          learnedCorrectIds: []
+        };
+      } else {
+        if (state.users[name].password !== pass) {
+          alert("Falsches Passwort für diesen Benutzer-Ordner.");
+          return;
+        }
+        state.users[name].online = true;
+      }
+      state.activeUser = name;
+      state.view = "learn";
+      state.learnIndex = 0;
+      state.learnFeedback = null;
+      saveState();
+      render();
+    }
+
+    function logoutUser() {
+      stopTimer();
+      if (state.activeUser) {
+        setOnlineStatus(state.activeUser, false);
+      }
+      state.activeUser = null;
+      state.view = "lobby";
+      saveState();
+      render();
+    }
+
+    function startExam() {
+      stopTimer();
+      state.view = "exam";
+      state.examIndex = 0;
+      state.examAnswers = {};
+      state.examRemaining = EXAM_SECONDS;
+      saveState();
+      startTimer();
+      render();
+    }
+
+    function startTimer() {
+      stopTimer();
+      timerInterval = setInterval(() => {
+        if (state.view !== "exam") {
+          stopTimer();
+          return;
+        }
+        state.examRemaining -= 1;
+        saveState();
+        const el = document.getElementById("examTimer");
+        if (el) el.textContent = "Zeit: " + formatTime(state.examRemaining);
+        if (state.examRemaining <= 0) {
+          finishExam();
+        }
+      }, 1000);
+    }
+
+    function stopTimer() {
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+      }
+    }
+
+    function scoreExam() {
+      let score = 0;
+      const total = QUESTIONS.length;
+      QUESTIONS.forEach((q) => {
+        const ans = state.examAnswers[q.id];
+        if (q.type === "single") {
+          if (ans === q.correct[0]) score += 1;
+        } else if (q.type === "multi") {
+          const picked = Array.isArray(ans) ? [...ans].sort() : [];
+          const expected = [...q.correct].sort();
+          if (picked.length === expected.length && picked.every((v, i) => v === expected[i])) {
+            score += 1;
+          }
+        } else if (q.type === "open") {
+          if (typeof ans === "string" && ans.trim().length >= 15) {
+            score += 0.5; // Selbstcheck-Hinweis bei offenen Aufgaben
+          }
+        }
+      });
+      const pct = score / total;
+      return { score, total, pct, passed: pct >= PASS_THRESHOLD };
+    }
+
+    function finishExam() {
+      stopTimer();
+      const res = scoreExam();
+      const u = state.users[state.activeUser];
+      if (u) {
+        u.examsDone += 1;
+        if (res.passed) u.examsPassed += 1;
+        else u.examsFailed += 1;
+      }
+      state.lastExamResult = res;
+      state.view = "result";
+      saveState();
+      render();
+    }
+
+    function renderHeader() {
+      const hc = document.getElementById("headerControls");
+      if (!state.activeUser) {
+        hc.innerHTML = `<span class="note" style="color:#cbd5e1;">Nicht angemeldet</span>`;
+        return;
+      }
+      const u = state.users[state.activeUser];
+      hc.innerHTML = `
+        <span>Ordner: <strong>${escapeHtml(state.activeUser)}</strong></span>${state.view === "exam" ? `<span class="timer-badge" id="examTimer">Zeit: ${formatTime(state.examRemaining)}</span>` : ""}
+        <button class="secondary" onclick="switchToLearn()">Lernen</button>
+        <button onclick="startExam()">Prüfung beginnen</button>
+        <button class="danger" onclick="logoutUser()">Abmelden</button>
+      `;
+    }
+
+    function switchToLearn() {
+      stopTimer();
+      state.view = "learn";
+      state.learnFeedback = null;
+      saveState();
+      render();
+    }
+
+    function renderLobby() {
+      const names = Object.keys(state.users);
+      const onlineCount = names.filter((n) => state.users[n].online).length;
+
+      let listHtml = names.length === 0
+        ? `<p class="note">Noch keine Benutzer angelegt. Lege links deinen Namen und dein Passwort an.</p>`
+        : names.map((n) => {
+            const u = state.users[n];
+            return `
+              <div class="user-item">
+                <div>
+                  <strong>${escapeHtml(n)}</strong>
+                  <span style="margin-left:8px; color:${u.online ? "#15803d" : "#64748b"}; font-weight:600;">
+                    ${u.online ? "● Drin / Aktiv" : "○ Nicht drin"}
+                  </span><br/>
+                  <span class="note">
+                    Prüfungen: <strong>${u.examsDone}</strong> |
+                    Bestanden: <strong style="color:#15803d">${u.examsPassed}</strong> |
+                    Nicht bestanden: <strong style="color:#b91c1c">${u.examsFailed}</strong>
+                  </span>
+                </div>
+                <button class="secondary" onclick="prefillUser('${escapeJs(n)}')">Ordner öffnen</button>
+              </div>
+            `;
+          }).join("");
+
+      document.getElementById("app").innerHTML = `
+        <div class="card">
+          <h2>Übersicht der Lerngruppe</h2>
+          <p>
+            Registrierte Benutzer insgesamt: <strong>${names.length}</strong> &nbsp;|&nbsp;
+            Gerade drin: <strong>${onlineCount}</strong>
+          </p>
+          <p class="note">
+            Hinweis: In dieser reinen HTML-Version werden Daten lokal im Browser gespeichert. Jeder Benutzer-Ordner ist durch ein Passwort geschützt.
+          </p>
+          ${listHtml}
+        </div>
+
+        <div class="card">
+          <h2>Benutzer-Ordner anlegen oder öffnen</h2>
+          <form onsubmit="handleAuthSubmit(event)">
+            <label for="userName">Name</label>
+            <input id="userName" type="text" placeholder="z. B. Ali oder Sara" required />
+
+            <label for="userPass">Passwort</label>
+            <input id="userPass" type="password" placeholder="Dein Passwort für deinen Ordner" required />
+
+            <button type="submit">Weiter zum Lernen</button>
+          </form>
+        </div>
+      `;
+    }
+
+    function prefillUser(name) {
+      const inp = document.getElementById("userName");
+      const pass = document.getElementById("userPass");
+      if (inp) inp.value = name;
+      if (pass) pass.focus();
+    }
+
+    function handleAuthSubmit(e) {
+      e.preventDefault();
+      const name = document.getElementById("userName").value;
+      const pass = document.getElementById("userPass").value;
+      createOrLoginUser(name, pass);
+    }
+
+    function renderLearn() {
+      const u = state.users[state.activeUser];
+      const q = QUESTIONS[state.learnIndex];
+      const learnedCount = u.learnedCorrectIds.length;
+      const pct = Math.round((learnedCount / QUESTIONS.length) * 100);
+
+      let bodyHtml = "";
+      if (q.type === "open") {
+        bodyHtml = `
+          <p class="note">Offene Klausuraufgabe – schreibe deine Lösung unten und prüfe sie gegen die Musterlösung.</p>
+          <textarea id="openDraft" rows="6" placeholder="Deine Antwort hier eintragen..."></textarea>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button onclick="markOpenLearned(${q.id})">Als richtig gelöst werten (+Prozent)</button>
+            <button class="secondary" onclick="toggleSample()">Musterlösung anzeigen</button>
+          </div>
+          <div id="sampleBox" style="display:none; margin-top:12px;">
+            <strong>Musterlösung:</strong>
+            <pre>${escapeHtml(q.sampleAnswer)}</pre>
+          </div>
+        `;
+      } else {
+        const inputType = q.type === "multi" ? "checkbox" : "radio";
+        const opts = q.options.map((opt, idx) => `
+          <label class="option-label">
+            <input type="${inputType}" name="learnOpt" value="${idx}" />
+            <span>${escapeHtml(opt)}</span>
+          </label>
+        `).join("");
+        bodyHtml = `
+          <form onsubmit="checkLearnAnswer(event, ${q.id})">
+            ${opts}
+            <button type="submit">Antwort prüfen</button>
+          </form>
+        `;
+      }
+
+      let fbHtml = "";
+      if (state.learnFeedback) {
+        fbHtml = `<div class="feedback ${state.learnFeedback.ok ? "ok" : "bad"}">${escapeHtml(state.learnFeedback.msg)}</div>`;
+      }
+
+      document.getElementById("app").innerHTML = `
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+            <strong>Lernfortschritt von ${escapeHtml(state.activeUser)}:${pct}% (${learnedCount}/${QUESTIONS.length})</strong>
+            <span class="note">Prüfungen: ${u.examsDone} | Bestanden: ${u.examsPassed} \vert{} Nicht bestanden:${u.examsFailed}</span>
+          </div>
+          <div class="progress-wrap">
+            <div class="progress-bar" style="width:${pct}%"></div>
+          </div>
+          <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-top:10px;">
+            <span class="note">Aufgabe ${state.learnIndex + 1} von${QUESTIONS.length}</span>
+            <button onclick="startExam()">Prüfung beginnen (130 Min.)</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Aufgabe ${q.id}</h3>
+          <p>${escapeHtml(q.q)}</p>
+          ${bodyHtml}${fbHtml}
+          <div style="display:flex; justify-content:space-between; margin-top:18px;">
+            <button class="secondary" onclick="moveLearn(-1)">← Vorherige</button>
+            <button class="secondary" onclick="moveLearn(1)">Nächste →</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function toggleSample() {
+      const box = document.getElementById("sampleBox");
+      if (box) box.style.display = box.style.display === "none" ? "block" : "none";
+    }
+
+    function markOpenLearned(qid) {
+      const u = state.users[state.activeUser];
+      if (!u.learnedCorrectIds.includes(qid)) {
+        u.learnedCorrectIds.push(qid);
+      }
+      state.learnFeedback = { ok: true, msg: "Als richtig gewertet – dein Prozentwert wurde aktualisiert!" };
+      saveState();
+      render();
+    }
+
+    function checkLearnAnswer(e, qid) {
+      e.preventDefault();
+      const q = QUESTIONS.find((item) => item.id === qid);
+      const checked = Array.from(document.querySelectorAll('input[name="learnOpt"]:checked')).map((el) => Number(el.value));
+      const expected = [...q.correct].sort();
+      const picked = [...checked].sort();
+      const isOk = picked.length === expected.length && picked.every((v, i) => v === expected[i]);
+
+      const u = state.users[state.activeUser];
+      if (isOk) {
+        if (!u.learnedCorrectIds.includes(qid)) {
+          u.learnedCorrectIds.push(qid);
+        }
+        state.learnFeedback = { ok: true, msg: "Richtig! Die Prozentanzeige steigt." };
+      } else {
+        const rightTexts = expected.map((i) => q.options[i]).join(" / ");
+        state.learnFeedback = { ok: false, msg: "Nicht ganz. Richtige Antwort: " + rightTexts };
+      }
+      saveState();
+      render();
+    }
+
+    function moveLearn(delta) {
+      state.learnIndex = (state.learnIndex + delta + QUESTIONS.length) % QUESTIONS.length;
+      state.learnFeedback = null;
+      saveState();
+      render();
+    }
+
+    function renderExam() {
+      const q = QUESTIONS[state.examIndex];
+      const currentVal = state.examAnswers[q.id];
+
+      const jumpButtons = QUESTIONS.map((item, idx) => {
+        const hasAns = state.examAnswers[item.id] !== undefined && state.examAnswers[item.id] !== "";
+        return `
+          <button class="q-jump ${idx === state.examIndex ? "active" : ""} ${hasAns ? "answered" : ""}" onclick="jumpToExam(${idx})">
+            ${item.id}
+          </button>
+        `;
+      }).join("");
+
+      let fieldHtml = "";
+      if (q.type === "open") {
+        fieldHtml = `
+          <textarea rows="7" placeholder="Antwort hier schreiben..." oninput="saveExamOpen(${q.id}, this.value)">${escapeHtml(currentVal || "")}</textarea>
+        `;
+      } else if (q.type === "multi") {
+        const arr = Array.isArray(currentVal) ? currentVal : [];
+        fieldHtml = q.options.map((opt, idx) => `
+          <label class="option-label">
+            <input type="checkbox" ${arr.includes(idx) ? "checked" : ""} onchange="saveExamMulti(${q.id},${idx}, this.checked)" />
+            <span>${escapeHtml(opt)}</span>
+          </label>
+        `).join("");
+      } else {
+        fieldHtml = q.options.map((opt, idx) => `
+          <label class="option-label">
+            <input type="radio" name="examSingle_${q.id}" ${currentVal === idx ? "checked" : ""} onchange="saveExamSingle(${q.id},${idx})" />
+            <span>${escapeHtml(opt)}</span>
+          </label>
+        `).join("");
+      }
+
+      document.getElementById("app").innerHTML = `
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <strong>Prüfungsmodus (130 Min.) – Aufgabe ${q.id} von${QUESTIONS.length}</strong>
+            <button class="danger" onclick="finishExam()">Prüfung abgeben</button>
+          </div>
+          <div class="nav-strip">${jumpButtons}</div>
+        </div>
+
+        <div class="card">
+          <h3>Aufgabe ${q.id}</h3>
+          <p>${escapeHtml(q.q)}</p>${fieldHtml}
+          <div style="display:flex; justify-content:space-between; margin-top:18px;">
+            <button class="secondary" onclick="jumpToExam(${Math.max(0, state.examIndex - 1)})">← Vorherige
